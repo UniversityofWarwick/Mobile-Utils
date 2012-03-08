@@ -67,7 +67,7 @@ exports.Strftime = function(dateObject, formatString){
 		},
 		'k': function(dateObject){ return NumberLib.ToPaddedString(dateObject.getMonth()+1,2); },
 		'K': function(dateObject){ return dateObject.getMonth()+1; },
-		'l': function(dateObject){ return NumberLib.ToPaddedString(dateObject.getMilliseconds(),4); },
+		'l': function(dateObject){ return NumberLib.ToPaddedString(dateObject.getMilliseconds(),3); },
 		'L': function(dateObject){ return dateObject.getMilliseconds(); },
 		'm': function(dateObject){ return NumberLib.ToPaddedString(dateObject.getMinutes(),2); },
 		'M': function(dateObject){ return dateObject.getMinutes(); },
@@ -86,4 +86,33 @@ exports.Strftime = function(dateObject, formatString){
 	return formatString.replace(/%([aAbBcdDehHiIkKlLmMoOpPsSwyY%])/g,function(m0,m1){
 		return replacements[m1](dateObject);
 	});
+};
+
+
+/**
+ * Parse a string in the ISO 8601 format
+ * 
+ * @param {String} dateString The ISO date string
+ * @returns {Date} The parsed date
+ */
+exports.ParseISO8601Date = function(dateString){
+	var isoRegex = /^(\d{4}|[+\-]\d{6})(?:-(\d{2})(?:-(\d{2}))?)?(?:T(\d{2}):(\d{2})(?::(\d{2})(?:(\.\d+))?)?(?:(Z)|([+\-])(\d{2})(?::(\d{2}))?)?)?$/;
+	var matches = isoRegex.exec(dateString);
+	// avoid NaN timestamps caused by “undefined” values being passed to Date.UTC
+	[ 1, 4, 5, 6, 7, 10, 11 ].forEach(function(k){
+		matches[k] = +matches[k] || 0;
+	});
+	
+	// allow undefined days and months
+    matches[2] = (+matches[2] || 1) - 1;
+    matches[3] = +matches[3] || 1;
+
+	var minutesOffset = 0;
+	if (matches[8] !== 'Z' && matches[9] !== undefined) {
+        minutesOffset = matches[10] * 60 + matches[11];
+        if (struct[9] === '+')
+            minutesOffset = 0 - minutesOffset;
+    }
+
+    return Date.UTC(matches[1], matches[2], matches[3], matches[4], matches[5] + minutesOffset, matches[6], matches[7] * 1000);
 };
