@@ -40,6 +40,9 @@ var Sitebuilder = {
 				}
 				
 			};
+			client.onerror = function(){
+				callback({page: null, errors: [["Error making request",this.getStatusText()]], fromCache: false});
+			};
 			client.send();
 		}
 	},
@@ -77,6 +80,9 @@ var Sitebuilder = {
 					callback({ pages: results, errors: [["Error parsing JSON data",e]] });
 				}
 				
+			};
+			client.onerror = function(){
+				callback({pages: results, errors: [["Error making request",this.getStatusText()]]});
 			};
 			client.send('page=' + parentUrl + '&pages=' + urlsToGet.join('&pages=') + '&rn' + Math.round(Math.random()*10000));
 		} else {

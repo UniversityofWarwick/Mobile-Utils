@@ -15,9 +15,22 @@
  */
 
 var OAuthAdapter = function(options){
+	if(!options)
+		options = {};
 	// Optional parameters
 	
 	var signatureMethod = options.signatureMethod || 'HMAC-SHA1';
+	
+	var now = new Date();
+    var tokenExpiry = options.tokenExpiry || new Date((now.setFullYear(now.getFullYear() + 1))); // Default 1 year for new tokens
+    
+    var libDirectory = options.libDirectory || 'lib/utils/oauth/'; // Locations of oauth.js and sha1.js
+    
+    var barColor = options.barColor;
+    
+    // one of the following is mandatory
+    var catchURL = options.catchURL;
+    var catchString = options.catchString;
 	
 	// Mandatory parameters
 	
@@ -29,13 +42,6 @@ var OAuthAdapter = function(options){
     var accessTokenURL = options.accessTokenURL;
     
     var serviceName = options.serviceName;
-    
-    var callbackURL = options.callbackURL;
-    
-    var now = new Date();
-    var tokenExpiry = options.tokenExpiry || new Date((now.setFullYear(now.getFullYear() + 1))); // Default 1 year for new tokens
-    
-    var libDirectory = options.libDirectory || 'lib/oauth/'; // Locations of oauth.js and sha1.js
     
     // Private variables   
      
@@ -65,7 +71,7 @@ var OAuthAdapter = function(options){
     OAuth.setSignatureLib(SignatureLib);
     
     // Check for and load an existing access token
-    loadConfig();
+    //loadConfig();
     
     // Public methods
     this.authorized = function(){
@@ -73,7 +79,6 @@ var OAuthAdapter = function(options){
     };
     
     this.send = send;
-    this.restartSendWithAuthorizedRequestToken = restartSendWithAuthorizedRequestToken;
     this.clearUserData = clearUserData;
     
     // Private methods
@@ -90,13 +95,14 @@ var OAuthAdapter = function(options){
     	var postBody = options.postBody;
     	
     	successCallback = options.successCallback;
-    	authRequiredCallback = options.authRequiredCallback || doAuth; // Handle token request if different from the default
     	failureCallback = options.failureCallback;
     	
     	if (accessToken == null || accessTokenSecret == null) {
     		// store this request for when the auth is complete
     		actionsQueue.push(options);
-    		authRequiredCallback();
+    		setupWebview();
+    		authWindow.open();
+    		doAuth();
     	} else {
     		
     		var message = createMessage(url);
@@ -111,6 +117,7 @@ var OAuthAdapter = function(options){
     		var client = Ti.Network.createHTTPClient();
     		client.open(method, url);
     		client.setRequestHeader("Authorization", "OAuth " + kvArrayToAuthString(message.parameters));
+    		client.clearCookies(url);
     		client.onload = successCallback;
     		client.onerror = failureCallback;
     		
@@ -121,19 +128,6 @@ var OAuthAdapter = function(options){
     		}
     		
     	}
-    };
-    
-    function restartSendWithAuthorizedRequestToken(options){
-    	var url = options.url;
-    	var method = options.method || 'GET';
-    	var postBody = options.postBody;
-    	requestToken = options.authorizedRequestToken;
-    	
-    	successCallback = options.successCallback;
-    	failureCallback = options.failureCallback;
-    	
-    	actionsQueue.push(options);
-    	getAccessToken();
     };
     
     var kvArrayToAuthString = function(array){
@@ -168,8 +162,6 @@ var OAuthAdapter = function(options){
         		accessToken = config.accessToken;
         	if (config.accessTokenSecret) 
         		accessTokenSecret = config.accessTokenSecret;
-        	if (config.requestTokenSecret) 
-        		requestTokenSecret = config.requestTokenSecret;
         }
     };
     
@@ -181,7 +173,6 @@ var OAuthAdapter = function(options){
         file.write(JSON.stringify({
             accessToken: accessToken,
             accessTokenSecret: accessTokenSecret,
-            requestTokenSecret: requestTokenSecret,
             expiry: tokenExpiry.valueOf()
         }));
     };
@@ -227,22 +218,26 @@ var OAuthAdapter = function(options){
               
         // Then authorize the request token
         
-        var resumeCallback = function(){
-        	var url = Ti.App.getArguments().url;
-        	if(url && url.indexOf(callbackURL) == 0){
-        		Ti.App.removeEventListener('resumed',resumeCallback);
+        var checkForAccessGrantedURL = function(){
+        	if(authWindowWebView.url.match(catchURL)){
+        		authWindowWebView.removeEventListener('load',checkForAccessGrantedURL);
+        		setWebViewLoading();
         		getAccessToken();
         	}
         };
-        if(Utils.GetPlatform() == 'iOS'){
-        	Ti.App.addEventListener('resumed',resumeCallback);
-        } else {
-        	// Android causes the app to restart not resume so save the config 
-        	// (essentially the requestTokenSecret) so that Android can get it when the app restarts
-        	saveConfig();
-        }
-        
-        Titanium.Platform.openURL(authorizeTokenURL + '?oauth_token=' + requestToken + '&oauth_callback=' + encodeURIComponent(callbackURL));
+        var checkForAccessGrantedString = function(){
+        	if(authWindowWebView.getHtml().match(catchString)){
+        		authWindowWebView.removeEventListener('load',checkForAccessGrantedString);
+        		setWebViewLoading();
+        		getAccessToken();
+        	}
+        };
+        if(catchURL)
+        	authWindowWebView.addEventListener('load',checkForAccessGrantedURL);
+        else if(catchString)
+        	authWindowWebView.addEventListener('load',checkForAccessGrantedString);
+        	
+        authWindowWebView.setUrl(authorizeTokenURL + '?oauth_token=' + requestToken);
     };
     
     var getAccessToken = function(){    
@@ -269,6 +264,7 @@ var OAuthAdapter = function(options){
         accessToken = responseParams['oauth_token'];
         accessTokenSecret = responseParams['oauth_token_secret'];
         saveConfig();
+        authWindow.close();
         processQueue();
 	};
 	
@@ -276,4 +272,34 @@ var OAuthAdapter = function(options){
         while ((q = actionsQueue.shift()) != null)
         	send(q);
     };
-}
+    
+    var setupWebview = function(){
+    	authWindow = Titanium.UI.createWindow({ title: 'Authentication required' });
+    	if(Titanium.Platform.osname == 'android'){
+    		authWindow.navBarHidden = false;
+    		authWindow.addEventListener('android:back',function(){ 
+    			// rather than just close the window, provide a bit more feedback
+    			authWindow.close();
+    			failureCallback({ userCancelled: true });
+    		});
+    	} else {
+    		if(barColor)
+    			authWindow.setBarColor(barColor);
+    		authWindow.setModal(true);
+    		var closeButton = Titanium.UI.createButton({ title: 'Cancel' });
+    		authWindow.setLeftNavButton(closeButton);
+    		closeButton.addEventListener('click',function(){
+    			authWindow.close();
+    			failureCallback({ userCancelled: true });
+    		});
+    	}
+    	authWindowWebView = Titanium.UI.createWebView({ url: '/' + libDirectory + 'loading.html' });
+    	authWindow.add(authWindowWebView);
+    };
+    
+    var setWebViewLoading = function(){
+    	authWindowWebView.setUrl('/' + libDirectory + 'loading.html');
+    };
+};
+
+exports.OAuthAdapter = OAuthAdapter;
