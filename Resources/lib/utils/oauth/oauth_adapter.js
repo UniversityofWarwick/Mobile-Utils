@@ -71,7 +71,7 @@ var OAuthAdapter = function(options){
     OAuth.setSignatureLib(SignatureLib);
     
     // Check for and load an existing access token
-    //loadConfig();
+    loadConfig();
     
     // Public methods
     this.authorized = function(){
@@ -93,6 +93,7 @@ var OAuthAdapter = function(options){
     	var url = options.url;
     	var method = options.method || 'GET';
     	var postBody = options.postBody;
+    	var customHeaders = options.customHeaders;
     	
     	successCallback = options.successCallback;
     	failureCallback = options.failureCallback;
@@ -100,9 +101,11 @@ var OAuthAdapter = function(options){
     	if (accessToken == null || accessTokenSecret == null) {
     		// store this request for when the auth is complete
     		actionsQueue.push(options);
-    		setupWebview();
-    		authWindow.open();
-    		doAuth();
+    		if(actionsQueue.length == 1){
+	    		setupWebview();
+	    		authWindow.open();
+	    		doAuth();
+    		}
     	} else {
     		
     		var message = createMessage(url);
@@ -118,6 +121,11 @@ var OAuthAdapter = function(options){
     		client.open(method, url);
     		client.setRequestHeader("Authorization", "OAuth " + kvArrayToAuthString(message.parameters));
     		client.clearCookies(url);
+    		if(customHeaders){
+    			for(header in customHeaders){
+    				client.setRequestHeader(header, customHeaders[header]);
+    			}
+    		}
     		client.onload = successCallback;
     		client.onerror = failureCallback;
     		
@@ -158,10 +166,14 @@ var OAuthAdapter = function(options){
         
         if (!config.expiry || new Date(config.expiry) > new Date()) {
         	tokenExpiry = new Date(config.expiry);
-        	if (config.accessToken) 
-        		accessToken = config.accessToken;
-        	if (config.accessTokenSecret) 
-        		accessTokenSecret = config.accessTokenSecret;
+        	if(!config.requestTokenURL || config.requestTokenURL == requestTokenURL){
+				// Only load the access token if the requestTokenURL matches
+				// otherwise the token will not be valid (we might have changed the scope for example)
+    			if (config.accessToken) 
+	        		accessToken = config.accessToken;
+	        	if (config.accessTokenSecret) 
+	        		accessTokenSecret = config.accessTokenSecret;
+        	}
         }
     };
     
@@ -173,7 +185,8 @@ var OAuthAdapter = function(options){
         file.write(JSON.stringify({
             accessToken: accessToken,
             accessTokenSecret: accessTokenSecret,
-            expiry: tokenExpiry.valueOf()
+            expiry: tokenExpiry.valueOf(),
+            requestTokenURL: requestTokenURL
         }));
     };
     
