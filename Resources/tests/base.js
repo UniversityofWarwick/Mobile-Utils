@@ -9,7 +9,7 @@ var TestStructure = {
 	}
 };
 
-exports.build = function(){
+var runAutomated = function(){
 	var fetchAndRun = function(key, stuctureObject){
 		if(stuctureObject.splice){ // is an array of tests
 			stuctureObject.forEach(function(testGroup){
@@ -46,4 +46,32 @@ exports.build = function(){
 	for(tests in TestStructure){
 		fetchAndRun(tests, TestStructure[tests]);
 	}
+};
+
+exports.build = function(args){
+	var tableView = Titanium.UI.createTableView();
+	var rowdata = [];
+	rowdata.push(Titanium.UI.createTableViewRow({
+		title: 'Run automated tests'
+	}));
+	rowdata.push(Titanium.UI.createTableViewRow({
+		title: 'Slideshow',
+		module: 'tests/ui/slideshow/slideshow'
+	}));
+	tableView.data = rowdata;
+	
+	tableView.addEventListener('click',function(e){
+		if(e.rowData.title == 'Run automated tests'){
+			runAutomated();
+		} else if(e.rowData.module){
+			var newWindow = Ti.UI.createWindow({
+				animated: true,
+				title: e.rowData.title
+			});
+			var newWindowBuilder = require(e.rowData.module);
+			newWindowBuilder.build({thisWindow: newWindow, tab: args.tab});
+			args.tab.open(newWindow);
+		}
+	});
+	args.thisWindow.add(tableView);
 };

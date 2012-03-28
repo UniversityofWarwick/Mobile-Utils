@@ -28,5 +28,25 @@ tabGroup.addTab(tab1);
 // open tab group
 tabGroup.open();
 
-// Run the tests
-require('tests/base').build();
+var tableView = Titanium.UI.createTableView();
+
+var rowdata = [];
+rowdata.push(Titanium.UI.createTableViewRow({
+	title: 'Tests',
+	module: 'tests/base'
+}));
+tableView.data = rowdata;
+
+tableView.addEventListener('click',function(e){
+	if(e.rowData.module){
+		var newWindow = Ti.UI.createWindow({
+			animated: true,
+			title: e.rowData.title
+		});
+		var newWindowBuilder = require(e.rowData.module);
+		newWindowBuilder.build({thisWindow: newWindow, tab: tab1});
+		tab1.open(newWindow);
+	}
+});
+
+win1.add(tableView);
