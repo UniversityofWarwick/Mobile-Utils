@@ -5,8 +5,8 @@ var Slideshow = function(options){
 	this.advanceTimeout = options.advanceTimeout || 3000;
 	this.fadeTime = options.fadeTime || 1000;
 	this.enableZoomAndPan = options.enableZoomAndPan || false;
-	
 	this.backgroundColor = options.backgroundColor || '#000';
+	this.scaleType = options.scaleType || 'fill';
 	
 	this._prefetchLimit = 5;
 	
@@ -15,6 +15,11 @@ var Slideshow = function(options){
 		height: this.height,
 		backgroundColor: this.backgroundColor,
 		borderRadius: 0 // magically makes the container crop the contents
+	});
+	var _this = this;
+	['top','left','bottom','right'].forEach(function(property){
+		if(options[property])
+			_this._container[property] = options[property];
 	});
 	
 	this._imageViews = [];
@@ -90,26 +95,34 @@ Slideshow.prototype._imageLoaded = function(imageBlob, index){
 Slideshow.prototype._prepareImageView = function(imageBlob){
 	Ti.API.debug('Preparing image');
 	var imageView = Titanium.UI.createImageView();
-	var targetWidth = this.width, targetHeight = this.height, 
-		imageWidth = imageBlob.width, imageHeight = imageBlob.height
+	var targetWidth = this.width, targetHeight = this.height, targetAspect = targetWidth / targetHeight,
+		imageWidth = imageBlob.width, imageHeight = imageBlob.height, imageAspect = imageWidth / imageHeight,
 		scale = 1;
-	
-	if(imageWidth >= targetWidth && imageHeight > targetHeight){
-		// requires downscaling
-		if(imageWidth - targetWidth > imageHeight - targetHeight)
-			// height is closest fit
-			scale = targetHeight/imageHeight;
-		else
-			// width is closest fit
-			scale = targetWidth/imageWidth;
+		
+	if(this.scaleType == 'fit'){
+		if(targetAspect > 1){
+			if(imageAspect < 1)
+				scale = targetWidth/imageWidth;
+			else
+				scale = targetHeight/imageHeight;
+		} else {
+			if(imageAspect < 1)
+				scale = targetHeight/imageHeight;
+			else
+				scale = targetWidth/imageWidth;
+		}
 	} else {
-		// at least one dimension requires upscaling
-		if(targetWidth - imageWidth > targetHeight - imageHeight)
-			// width needs the most
-			scale = targetWidth/imageWidth;
-		else
-			// height needs the most
-			scale = targetHeight/imageHeight;
+		if(targetAspect > 1){
+			if(imageAspect > 1)
+				scale = targetWidth/imageWidth;
+			else
+				scale = targetHeight/imageHeight;
+		} else {
+			if(imageAspect > 1)
+				scale = targetHeight/imageHeight;
+			else
+				scale = targetWidth/imageWidth;
+		}
 	}
 	
 	imageView.height = imageHeight * scale;
@@ -147,9 +160,13 @@ Slideshow.prototype._advance = function(){
 
 Slideshow.prototype._startZoomAndPan = function(imageView){
 	var zoomFactor = 1.1;
-	var translateY = (imageView.height - this.height) * (Math.random() - 0.5) * zoomFactor;
-	var translateX = (imageView.width - this.width) * (Math.random() - 0.5) * zoomFactor;
-	var matrix = Titanium.UI.create2DMatrix().scale(zoomFactor).translate(translateX, translateY);
+	if(this.scaleType == 'fit'){
+		var matrix = Titanium.UI.create2DMatrix().scale(zoomFactor);
+	} else {
+		var translateY = (imageView.height - this.height) * (Math.random() - 0.5) * zoomFactor;
+		var translateX = (imageView.width - this.width) * (Math.random() - 0.5) * zoomFactor;
+		var matrix = Titanium.UI.create2DMatrix().translate(translateX, translateY).scale(zoomFactor);
+	}
 	var animation = Titanium.UI.createAnimation({
 		transform: matrix,
 		duration: this.advanceTimeout + this.fadeTime

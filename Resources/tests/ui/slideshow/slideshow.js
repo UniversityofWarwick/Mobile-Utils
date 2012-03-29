@@ -1,9 +1,9 @@
 exports.build = function(args){
 	var Slideshow = require('lib/ui/slideshow/slideshow');
-	var mySlideshow = new Slideshow({
+	var mySlideshow1 = new Slideshow({
 		width: 300,
-		height: 300,
-		backgroundColor: '#f00',
+		height: 150,
+		backgroundColor: '#000',
 		images: [
 			Titanium.Filesystem.getResourcesDirectory() + 'tests/ui/slideshow/image1.jpg',
 			Titanium.Filesystem.getResourcesDirectory() + 'tests/ui/slideshow/image2.jpg',
@@ -11,9 +11,30 @@ exports.build = function(args){
 		],
 		advanceTimeout: 2000,
 		fadeTime: 2000,
-		enableZoomAndPan: true 
+		enableZoomAndPan: true,
+		top: 5
 	});
-	args.thisWindow.add(mySlideshow.getView());
-	args.thisWindow.addEventListener('open', function(){ mySlideshow.start(); });
-	args.thisWindow.addEventListener('close', function(){ mySlideshow.stop(); });
+	
+	var mySlideshow2 = new Slideshow({
+		width: 250,
+		height: 300,
+		backgroundColor: '#000',
+		images: [
+			Titanium.Filesystem.getResourcesDirectory() + 'tests/ui/slideshow/image3.jpg',
+			Titanium.Filesystem.getResourcesDirectory() + 'tests/ui/slideshow/image1.jpg',
+			Titanium.Filesystem.getResourcesDirectory() + 'tests/ui/slideshow/image2.jpg'
+		],
+		advanceTimeout: 2000,
+		fadeTime: 2000,
+		enableZoomAndPan: true,
+		top: 160,
+		scaleType: 'fit'
+	});
+	
+	args.thisWindow.add(mySlideshow1.getView());
+	args.thisWindow.addEventListener('open', function(){ mySlideshow1.start(); });
+	args.thisWindow.addEventListener('close', function(){ mySlideshow1.stop(); });
+	args.thisWindow.add(mySlideshow2.getView());
+	args.thisWindow.addEventListener('open', function(){ mySlideshow2.start(); });
+	args.thisWindow.addEventListener('close', function(){ mySlideshow2.stop(); });
 };

@@ -10,7 +10,8 @@ var tabGroup = Titanium.UI.createTabGroup();
 //
 var win1 = Titanium.UI.createWindow({  
     title:'Tab 1',
-    backgroundColor:'#fff'
+    backgroundColor:'#fff',
+    tabBarHidden: true
 });
 var tab1 = Titanium.UI.createTab({  
     icon:'KS_nav_views.png',
